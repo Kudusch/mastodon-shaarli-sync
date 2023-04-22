@@ -1,0 +1,2 @@
+SERVER = "example.com"
+TOKEN = ""
