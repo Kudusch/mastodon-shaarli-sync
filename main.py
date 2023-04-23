@@ -12,20 +12,27 @@ from bs4 import BeautifulSoup
 import time
 from datetime import datetime
 
-#api_base = "https://www.{0}".format((urlparse(config.SERVER)).netloc)
-if not config.SERVER.startswith("https"):
-    if config.SERVER.startswith("http:"):
-        exit()
-    api_base = f"https://{config.SERVER}"
-headers = {"Authorization": f"Bearer {config.TOKEN}"}
+def check_config(config):
+    return(True)
 
-def make_header():
+def make_shaarli_header():
     header = json.dumps({"typ":"JWT","alg":"HS512"}).encode("utf-8")
     payload = json.dumps({"iat": int(time.time())}).encode("utf-8")
     content = f"{base64.b64encode(header).decode().strip('=')}.{base64.b64encode(payload).decode().strip('=')}".encode("utf-8")
-    signature = hmac.new("e7263694bd85".encode(), content, "sha512").digest()
+    signature = hmac.new(f"{config.SHAARLI_SECRET}".encode(), content, "sha512").digest()
     token = f"{base64.b64encode(header).decode().strip('=')}.{base64.b64encode(payload).decode().strip('=')}.{base64.urlsafe_b64encode(signature).decode().strip('=')}"
     return {"Authorization":f"Bearer {token}"}
+
+def make_mastodon_header():
+    return({"Authorization": f"Bearer {config.MASTODON_TOKEN}"})
+
+def title_from_url(u):
+    try:
+        r = requests.get(u)
+        soup = BeautifulSoup(r.text, "html.parser")
+        return(soup.find("title").get_text())
+    except:
+        return("")
 
 def urls_from_toot(toot):
     content = BeautifulSoup(toot["content"], "html.parser")
@@ -38,19 +45,11 @@ def urls_from_toot(toot):
     else:
         return [toot["url"]]
 
-def title_from_url(u):
-    try:
-        r = requests.get(u)
-        soup = BeautifulSoup(r.text, "html.parser")
-        return(soup.find("title").get_text())
-    except:
-        return("")
-
-def save_url(url, toot_url):
+def add_link(url, toot):
     payload = {
         "url": url,
-        "title": title_from_url(u),
-        "description": toot_url,
+        "title": title_from_url(url),
+        "description": toot["uri"],
         "tags": [
             "unread",
             "mastodon-bookmark"
@@ -59,66 +58,66 @@ def save_url(url, toot_url):
         "created": datetime.now().isoformat(),
         "updated": datetime.now().isoformat()
     }
-    r = requests.post('https://kudusch.de/apps/Shaarli/api/v1/links', json=payload, headers=make_header())
+    r = requests.post(f"{shaarli_server}/api/v1/links", json=payload, headers=make_shaarli_header())
     if r.status_code == 201:
         print("New url saved!")
-    elif r.status_code == 409:
-        print("url already saved!")
-    
+        print(f"{r.json()['id']}: {r.json()['title']}")
+        return({"url":url,"shaarli_id":r.json()["id"], "toot_id":toot["id"]})
 
-def print_link(link_id):
-    r = requests.get(f"https://kudusch.de/apps/Shaarli/api/v1/links{link_id}", headers=make_header())
-    if (r.status_code == 200):
-        link = r.json()
-        print(f"{link['title']} ({link['url']})")
-    else:
-        return False
+def delete_bookmark(toot_id=None, shaarli_id=None):
+    if toot_id:
+        r = requests.post(f"{mastodon_server}/api/v1/statuses/{toot_id}/unbookmark", headers = make_mastodon_header())
+    if shaarli_id:
+        r = requests.delete(f"{shaarli_server}/Shaarli/api/v1/links/{shaarli_id}", headers=make_shaarli_header())
+
+def get_toots():
+    toots = []
+    r = requests.get(f"{mastodon_server}/api/v1/bookmarks", headers = make_mastodon_header())
+    if r.status_code == 200:
+        toots.extend(r.json())
+    while "next" in r.links.keys():
+        r = requests.get(r.links["next"]["url"], headers = headers)
+        toots.extend(r.json())
+    return toots
 
 def get_links():
-    r = requests.get('https://kudusch.de/apps/Shaarli/api/v1/links', headers=make_header())
+    r = requests.get(f"{shaarli_server}/api/v1/links?searchtags={tag_name}", headers=make_shaarli_header())
     if (r.status_code == 200):
         return r.json()
     else:
-        return False
+        print(r.json())
+        return []
 
-def read_headers(headers):
-    try:
-        links = headers["Link"].split(", ")
-    except:
-        pass
+if check_config(config):
+    mastodon_server = f"https://{config.MASTODON_SERVER}"
+    shaarli_server = f"https://{config.SHAARLI_SERVER}"
+    tag_name = config.TAG_NAME
+else:
+    print("config error")
 
-def get_bookmarks():
-    bookmarks = []
-    r = requests.get(f"{api_base}/api/v1/bookmarks", headers = headers)
-    if r.status_code == 200:
-        bookmarks.extend(r.json())
-    while "next" in r.links.keys():
-        r = requests.get(r.links["next"]["url"], headers = headers)
-        bookmarks.extend(r.json())
-    return bookmarks
+try:
+    old_state = json.load(open("state.json", "r"))
+except:
+    old_state = []
 
-if __name__ == "__main__":
-    try:
-        with open("state.json", "r") as f:
-            state = json.load(f)
-    except:
-        state = {}
-        state = {"links": get_links(), "toots": get_bookmarks()}
-    
-    bookmarked_urls = state["bookmarked_urls"]
-    n_bookmarked_urls = len(bookmarked_urls)
-    bookmarked_toots = get_bookmarks()
-    bookmarked_urls = {k: v for k, v in bookmarked_urls.items() if k in [t["id"] for t in bookmarked_toots]}
-    if len(bookmarked_urls) != n_bookmarked_urls:
-        print(f"Removed {n_bookmarked_urls-len(bookmarked_urls)} bookmarked toot")
-    for m in bookmarked_toots:
-        if not m["id"] in bookmarked_urls:
-            urls = urls_from_toot(m)
-            if len(urls) > 0:
-                bookmarked_urls[m["id"]] = {"saved_at":int(time.time()), "urls":urls, "uri":m["uri"]}
-                print(f"Found new bookmarked toot with id {m['id']} and {len(urls)} urls")
-                for u in urls:
-                    save_url(u, m["uri"])
-    with open("state.json", "w") as f:
-        print(f"Bookmarked urls form {len(bookmarked_urls)} toots.")
-        json.dump(bookmarked_urls, f)
+state = []
+bookmarked_toots = get_toots()
+bookmarked_links = get_links()
+for b in old_state:
+    if not b["toot_id"] in [t["id"] for t in bookmarked_toots]:
+        delete_bookmark(shaarli_id=b["shaarli_id"])
+    elif not b["shaarli_id"] in [t["id"] for t in bookmarked_links]:
+        delete_bookmark(toot_id=b["toot_id"])
+    else:
+        state.append(b)
+
+for t in bookmarked_toots:
+    if not t["id"] in [b["toot_id"] for b in state]:
+        for u in urls_from_toot(t):
+            state.append(add_link(u, t))
+
+print(state)
+
+with open("state.json", "w") as f:
+    json.dump(state, f)
+

@@ -1,2 +1,5 @@
-SERVER = "example.com"
-TOKEN = ""
+TAG_NAME = "mastodon-bookmark"
+MASTODON_SERVER = "example.social"
+MASTODON_TOKEN = ""
+SHAARLI_SERVER = "example.com/Shaarli"
+SHAARLI_SECRET = ""
