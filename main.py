@@ -11,13 +11,13 @@ from bs4 import BeautifulSoup
 import time
 import configparser
 import getpass
-
+from pathlib import Path
 from datetime import datetime
 
 def check_config():
     try:
         config = configparser.ConfigParser()
-        config.read("config.ini")
+        config.read_file(open(Path(__file__).with_name("config.ini").absolute()))
         if not config["shaarli"]["server"].startswith("https:"):
             config["shaarli"]["server"] = f"https://{config['shaarli']['server']}"
         if not config["mastodon"]["server"].startswith("https:"):
@@ -117,7 +117,7 @@ def add_link(url, toot, link=None):
             else:
                 print(r.staus_code, r.json())
         else:
-            print("Nothing to do")
+            #print("Nothing to do")
             return({
                 "url":url,
                 "shaarli_id":r.json()["id"],
@@ -155,7 +155,8 @@ def get_links():
 
 def run():
     try:
-        old_state = json.load(open("state.json", "r"))
+        with open(Path(__file__).with_name("state.json").absolute(), "r") as f:
+            old_state = json.load(f)
     except:
         old_state = []
 
@@ -179,7 +180,7 @@ def run():
             for u in urls_from_toot(t):
                 state.append(add_link(u, t))
 
-    with open("state.json", "w") as f:
+    with open(Path(__file__).with_name("state.json").absolute(), "w") as f:
         json.dump(state, f)
 
     #for b in state:
