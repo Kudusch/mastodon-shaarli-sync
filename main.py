@@ -104,20 +104,18 @@ def add_link(url, toot, link=None):
     }
     r = requests.post(f"{config['shaarli']['server']}/api/v1/links", json=payload, headers=make_shaarli_header())
     if r.status_code == 201:
-        print("New url saved!")
-        print(f"{r.json()['id']}: {r.json()['title']}")
+        print(f"{datetime.now():%Y-%m-%d %H:%M} | New url saved | {r.json()['id']}: {r.json()['title']}")
         return({"url":url,"shaarli_id":r.json()["id"], "toot_id":toot["id"], "created_at":datetime.now().isoformat()})
     elif r.status_code == 409:
         if not config["shaarli"]["tag_name"] in r.json()["tags"]:
             r = update_link(r.json())
             if r.status_code == 200:
                 print("Existing url updated!")
-                print(f"{r.json()['id']}: {r.json()['title']}")
+                print(f"{datetime.now():%Y-%m-%d %H:%M} | Existing url updated | {r.json()['id']}: {r.json()['title']}")
                 return({"url":url,"shaarli_id":r.json()["id"], "toot_id":toot["id"], "created_at":datetime.now().isoformat()})
             else:
                 print(r.staus_code, r.json())
         else:
-            #print("Nothing to do")
             return({
                 "url":url,
                 "shaarli_id":r.json()["id"],
@@ -130,10 +128,10 @@ def add_link(url, toot, link=None):
 
 def delete_bookmark(toot_id=None, shaarli_id=None):
     if toot_id:
-        print("Unbookmarking toot")
+        print(f"{datetime.now():%Y-%m-%d %H:%M} | Unbookmarking toot | id:{toot_id}")
         r = requests.post(f"{config['mastodon']['server']}/api/v1/statuses/{toot_id}/unbookmark", headers = make_mastodon_header())
     if shaarli_id:
-        print("Deleting Shaarli link")
+        print(f"{datetime.now():%Y-%m-%d %H:%M} | Deleting Shaarli link | id:{shaarli_id}")
         r = requests.delete(f"{config['shaarli']['server']}/api/v1/links/{shaarli_id}", headers=make_shaarli_header())
 
 def get_toots():
@@ -165,11 +163,11 @@ def run():
     bookmarked_links = get_links()
     for b in old_state:
         if not b["toot_id"] in [t["id"] for t in bookmarked_toots]:
-            print("Change in Mastodon detected, deleting bookmark")
+            #print("Change in Mastodon detected, deleting bookmark")
             delete_bookmark(shaarli_id=b["shaarli_id"])
             bookmarked_links = get_links()
         elif not b["shaarli_id"] in [t["id"] for t in bookmarked_links]:
-            print("Change in Shaarli detected, unbookmarking toot")
+            #print("Change in Shaarli detected, unbookmarking toot")
             delete_bookmark(toot_id=b["toot_id"])
             bookmarked_toots = get_toots()
         else:
