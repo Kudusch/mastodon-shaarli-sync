@@ -1,3 +1,5 @@
+![mastodon-shaarli-sync]([http://url/to/img.png](https://kudusch.de/projects/uploads/files/icon.png))
+
 # mastodon-shaarli-sync
 
 Sync mastodon bookmarks to shaarli
