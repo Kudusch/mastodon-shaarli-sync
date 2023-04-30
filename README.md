@@ -1,7 +1,5 @@
-[[https://kudusch.de/projects/uploads/files/icon.png|alt=mastodon-shaarli-sync]]
-
-
 # mastodon-shaarli-sync
+<img src="https://raw.githubusercontent.com/Kudusch/mastodon-shaarli-sync/main/icon.png" width="200" />
 
 Sync mastodon bookmarks to shaarli
 
