@@ -1,4 +1,5 @@
-![mastodon-shaarli-sync](https://kudusch.de/projects/uploads/files/icon.png)
+[[https://kudusch.de/projects/uploads/files/icon.png|alt=mastodon-shaarli-sync]]
+
 
 # mastodon-shaarli-sync
 
